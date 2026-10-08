@@ -7,7 +7,7 @@ A collection of skills for coding agents. Each directory under `skills/` is an i
 Install one skill with [`npx skills`](https://www.npmjs.com/package/skills), replacing `<skill-name>` with a name from the list below:
 
 ```sh
-npx skills add samuelhe52/agent-skills --skill <skill-name>
+npx skills add samuelhe52/skills --skill <skill-name>
 ```
 
 ## Skills
