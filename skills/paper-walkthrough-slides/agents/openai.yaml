@@ -1,0 +1,4 @@
+interface:
+  display_name: "Paper Walkthrough Slides"
+  short_description: "Turn a paper into an HTML slide deck with a closing critique"
+  default_prompt: "Use $paper-walkthrough-slides to read this paper and build a walkthrough slide deck that ends with a summary and critique."
