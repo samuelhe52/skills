@@ -237,11 +237,170 @@
   document.addEventListener('keydown', e => {
     const fwd = ['ArrowRight','ArrowDown','PageDown',' '].includes(e.key);
     const back = ['ArrowLeft','ArrowUp','PageUp'].includes(e.key);
-    if (!fwd && !back) return;
+    if ((!fwd && !back) || e.shiftKey) return;  // Shift+arrows extend a text selection
     e.preventDefault();
     const i = Math.min(pages.length - 1, Math.max(0, current() + (fwd ? 1 : -1)));
     pages[i].scrollIntoView({ behavior:'smooth', block:'center' });
   });
+</script>
+<!-- Select text to highlight it; click a highlight to remove it. Saved per browser in localStorage. -->
+<style>
+  mark.hl { background:#ffe58a; color:inherit; border-radius:2px; cursor:pointer; }
+  #hl-btn { position:fixed; display:none; transform:translate(-50%, -100%); margin-top:-8px; padding:4px 12px; border:0; border-radius:6px;
+            background:#1d2433; color:#fff; font:13px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; cursor:pointer; z-index:1000; }
+</style>
+<button id="hl-btn" type="button"></button>
+<script>
+(() => {
+  const KEY = 'highlights:' + location.pathname.split('/').pop();
+  const CTX = 24;
+  const btn = document.getElementById('hl-btn');
+  const [ADD, REMOVE] = document.documentElement.lang.startsWith('zh') ? ['高亮', '取消高亮'] : ['Highlight', 'Remove'];
+  const pages = () => [...document.querySelectorAll('.page')];
+  const textNodes = page => {
+    const w = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, { acceptNode: n =>
+      n.parentElement.closest('script, style') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+    const out = [];
+    for (let n; (n = w.nextNode());) out.push(n);
+    return out;
+  };
+  const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
+  const store = list => { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {} };
+
+  // Text-node pieces of the selection, with offsets into the page's concatenated text.
+  const spansOf = (page, range) => {
+    let pos = 0;
+    const out = [];
+    for (const node of textNodes(page)) {
+      if (range.intersectsNode(node)) {
+        const start = node === range.startContainer ? range.startOffset : 0;
+        const end = node === range.endContainer ? range.endOffset : node.length;
+        if (end > start) out.push({ node, start, end, gs: pos + start, ge: pos + end });
+      }
+      pos += node.length;
+    }
+    return out;
+  };
+  const spansIn = (nodes, gs, ge) => {
+    let pos = 0;
+    const out = [];
+    for (const node of nodes) {
+      const start = Math.max(gs - pos, 0);
+      const end = Math.min(ge - pos, node.length);
+      if (end > start) out.push({ node, start, end });
+      pos += node.length;
+    }
+    return out;
+  };
+  const wrap = (spans, id) => spans.forEach(({ node, start, end }) => {
+    if (!node.data.slice(start, end).trim()) return;
+    const t = start > 0 ? node.splitText(start) : node;
+    if (end - start < t.length) t.splitText(end - start);
+    const mark = document.createElement('mark');
+    mark.className = 'hl';
+    mark.dataset.id = id;
+    t.before(mark);
+    mark.append(t);
+  });
+
+  const count = (s, sub) => { let n = 0; for (let i = s.indexOf(sub); i >= 0; i = s.indexOf(sub, i + 1)) n++; return n; };
+
+  // Find each highlight by its surrounding text on any slide, so inserting or deleting slides
+  // does not move it. The saved slide is searched first; a quote whose context changed is
+  // restored only if it occurs exactly once in the whole deck, otherwise it is skipped.
+  const restoreAll = list => {
+    const all = pages();
+    const flats = all.map(p => textNodes(p).map(n => n.data).join(''));
+    let moved = false;
+    for (const item of list) {
+      const order = [item.page, ...all.keys()].filter((p, i, a) => p in flats && a.indexOf(p) === i);
+      const ctx = item.before + item.quote + item.after;
+      let page = order.find(p => flats[p].includes(ctx));
+      let gs = page === undefined ? -1 : flats[page].indexOf(ctx) + item.before.length;
+      if (gs < 0 && flats.reduce((n, f) => n + count(f, item.quote), 0) === 1) {
+        page = flats.findIndex(f => f.includes(item.quote));
+        gs = flats[page].indexOf(item.quote);
+      }
+      if (gs < 0) continue;
+      wrap(spansIn(textNodes(all[page]), gs, gs + item.quote.length), item.id);
+      if (page !== item.page) { item.page = page; moved = true; }
+    }
+    if (moved) store(list);
+  };
+
+  const selectionSpans = () => {
+    const sel = getSelection();
+    if (sel.isCollapsed) return null;
+    const range = sel.getRangeAt(0);
+    const page = pages().find(p => p.contains(range.commonAncestorContainer));
+    if (!page) return null;
+    const spans = spansOf(page, range);
+    return spans.length ? { page, spans } : null;
+  };
+
+  let pendingRemove = null;  // id of the highlight whose 取消高亮 button is showing
+  const hide = () => { btn.style.display = 'none'; pendingRemove = null; };
+  const place = (r, label) => {
+    btn.textContent = label;
+    btn.style.left = (r.left + r.width / 2) + 'px';
+    btn.style.top = r.top + 'px';
+    btn.style.display = 'block';
+  };
+  const showFor = () => {
+    const found = selectionSpans();
+    if (found) {
+      pendingRemove = null;
+      return place(getSelection().getRangeAt(0).getBoundingClientRect(), ADD);
+    }
+    if (!pendingRemove) hide();
+  };
+
+  const addHighlight = () => {
+    const found = selectionSpans();
+    if (!found) return hide();
+    const { page, spans } = found;
+    const nodes = textNodes(page);
+    const flat = nodes.map(n => n.data).join('');
+    const gs = spans[0].gs;
+    const ge = spans[spans.length - 1].ge;
+    const id = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+    const item = {
+      id,
+      page: pages().indexOf(page),
+      quote: flat.slice(gs, ge),
+      before: flat.slice(Math.max(0, gs - CTX), gs),
+      after: flat.slice(ge, ge + CTX),
+    };
+    wrap(spans, id);
+    store([...load(), item]);
+    getSelection().removeAllRanges();
+    hide();
+  };
+
+  const remove = id => {
+    document.querySelectorAll(`mark.hl[data-id="${id}"]`).forEach(m => {
+      const parent = m.parentNode;
+      m.replaceWith(...m.childNodes);
+      parent.normalize();
+    });
+    store(load().filter(h => h.id !== id));
+  };
+
+  btn.addEventListener('mousedown', e => e.preventDefault());
+  btn.addEventListener('click', () => pendingRemove ? (remove(pendingRemove), hide()) : addHighlight());
+  document.addEventListener('mouseup', () => setTimeout(showFor, 0));
+  document.addEventListener('keyup', showFor);
+  document.addEventListener('scroll', hide, true);
+  document.addEventListener('click', e => {
+    if (e.target === btn) return;
+    const mark = e.target.closest('mark.hl');
+    if (!mark || !getSelection().isCollapsed) { pendingRemove = null; return; }
+    pendingRemove = mark.dataset.id;
+    place(mark.getBoundingClientRect(), REMOVE);
+  });
+
+  restoreAll(load());
+})();
 </script>
 </body>
 </html>
