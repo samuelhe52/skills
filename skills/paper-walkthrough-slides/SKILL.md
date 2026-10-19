@@ -59,7 +59,7 @@ A typical empirical paper maps to the sequence below. Adapt it: a theory paper s
 
 ### 3. Write the deck
 
-Start from `assets/template.html`. It has the slide frame (16:9, viewport scaling, arrow-key navigation, text highlighting that the presenter's browser remembers across reloads, print CSS with one slide per PDF page), KaTeX, and components: stat tiles, panels, equations, pseudocode, an argument chain, figures, bar charts, tables, and critique markers. Reusing these keeps decks consistent from paper to paper.
+Start from `assets/template.html`. It has the slide frame (16:9, viewport scaling, arrow-key navigation, text highlights and notes that the presenter's browser remembers across reloads, print CSS with one slide per PDF page), KaTeX, and components: stat tiles, panels, equations, pseudocode, an argument chain, figures, bar charts, tables, and critique markers. Reusing these keeps decks consistent from paper to paper.
 
 - **Headlines state the finding** ("Linear attention matches softmax up to 1.3B parameters", not "Results"). The subtitle gives the context needed to read the slide. Each footer cites its source (section, table, figure, equation) and the slide number.
 - **Figures from the paper:** include them when they carry information a chart or bullet can't — architecture and pipeline diagrams, qualitative samples, curves whose shape is the result, and any figure the paper's argument hinges on. Show each at a readable size and caption it "Figure N in the paper", plus a sentence on what to look at. When a result is tabulated, a native bar chart or table is usually clearer than a screenshot. When a result exists only as a plot, show the plot rather than estimating values from it.

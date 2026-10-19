@@ -243,19 +243,40 @@
     pages[i].scrollIntoView({ behavior:'smooth', block:'center' });
   });
 </script>
-<!-- Select text to highlight it; click a highlight to remove it. Saved per browser in localStorage. -->
+<!-- Select text to highlight it or attach a note; click a highlight or note to edit or remove it. Saved per browser in localStorage. -->
 <style>
   mark.hl { background:#ffe58a; color:inherit; border-radius:2px; cursor:pointer; }
-  #hl-btn { position:fixed; display:none; transform:translate(-50%, -100%); margin-top:-8px; padding:4px 12px; border:0; border-radius:6px;
-            background:#1d2433; color:#fff; font:13px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; cursor:pointer; z-index:1000; }
+  mark.hl.has-note { background:#d6e6ff; box-shadow:inset 0 -2px 0 #5b8def; }
+  mark.hl.note-end::after { content:'✎'; margin-left:1px; font-size:.7em; vertical-align:super; color:#3f6fd8; }
+  #hl-bar { position:fixed; display:none; transform:translate(-50%, -100%); margin-top:-8px; border-radius:6px; overflow:hidden; background:#1d2433; z-index:1000; }
+  #hl-bar button { padding:4px 12px; border:0; background:none; color:#fff; font:13px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; cursor:pointer; }
+  #hl-bar button + button { border-left:1px solid #3a4459; }
+  #hl-bar button:hover { background:#2e3850; }
+  #hl-note { position:fixed; display:none; width:300px; padding:8px; background:#fff; border:1px solid #c9d2e3; border-radius:8px;
+             box-shadow:0 6px 20px rgba(0,0,0,.18); z-index:1001; font:13px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
+  #hl-note textarea { display:block; width:100%; box-sizing:border-box; min-height:80px; padding:6px; resize:vertical;
+                      border:1px solid #c9d2e3; border-radius:4px; font:inherit; color:#1d2433; }
+  #hl-note .row { display:flex; justify-content:flex-end; gap:6px; margin-top:6px; }
+  #hl-note button { padding:3px 12px; border:1px solid #c9d2e3; border-radius:4px; background:#fff; font:inherit; cursor:pointer; }
+  #hl-note button[data-act="save"] { border-color:#1d2433; background:#1d2433; color:#fff; }
+  @media print { #hl-bar, #hl-note { display:none !important; } mark.hl.note-end::after { content:none; } }
 </style>
-<button id="hl-btn" type="button"></button>
+<div id="hl-bar"></div>
+<div id="hl-note"><textarea></textarea><div class="row"><button type="button" data-act="del"></button><button type="button" data-act="save"></button></div></div>
 <script>
 (() => {
   const KEY = 'highlights:' + location.pathname.split('/').pop();
   const CTX = 24;
-  const btn = document.getElementById('hl-btn');
-  const [ADD, REMOVE] = document.documentElement.lang.startsWith('zh') ? ['高亮', '取消高亮'] : ['Highlight', 'Remove'];
+  const T = document.documentElement.lang.startsWith('zh')
+    ? { add:'高亮', note:'批注', remove:'取消高亮', save:'保存', del:'删除', hint:'写批注…（⌘/Ctrl+Enter 保存，Esc 取消）' }
+    : { add:'Highlight', note:'Note', remove:'Remove', save:'Save', del:'Delete', hint:'Write a note… (⌘/Ctrl+Enter to save, Esc to cancel)' };
+  const bar = document.getElementById('hl-bar');
+  const editor = document.getElementById('hl-note');
+  const box = editor.querySelector('textarea');
+  box.placeholder = T.hint;
+  editor.querySelector('[data-act="save"]').textContent = T.save;
+  editor.querySelector('[data-act="del"]').textContent = T.del;
+
   const pages = () => [...document.querySelectorAll('.page')];
   const textNodes = page => {
     const w = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, { acceptNode: n =>
@@ -266,6 +287,7 @@
   };
   const load = () => { try { return JSON.parse(localStorage.getItem(KEY)) || []; } catch { return []; } };
   const store = list => { try { localStorage.setItem(KEY, JSON.stringify(list)); } catch {} };
+  const update = (id, fields) => store(load().map(h => h.id === id ? { ...h, ...fields } : h));
 
   // Text-node pieces of the selection, with offsets into the page's concatenated text.
   const spansOf = (page, range) => {
@@ -302,6 +324,17 @@
     t.before(mark);
     mark.append(t);
   });
+  const marksOf = id => [...document.querySelectorAll(`mark.hl[data-id="${id}"]`)];
+  // The note shows as a tooltip and a ✎ after the last piece; both live outside the text nodes, so anchoring is unaffected.
+  const decorate = (id, note) => {
+    const marks = marksOf(id);
+    marks.forEach(m => {
+      m.classList.toggle('has-note', !!note);
+      m.classList.remove('note-end');
+      if (note) m.title = note; else m.removeAttribute('title');
+    });
+    if (note && marks.length) marks[marks.length - 1].classList.add('note-end');
+  };
 
   const count = (s, sub) => { let n = 0; for (let i = s.indexOf(sub); i >= 0; i = s.indexOf(sub, i + 1)) n++; return n; };
 
@@ -323,6 +356,7 @@
       }
       if (gs < 0) continue;
       wrap(spansIn(textNodes(all[page]), gs, gs + item.quote.length), item.id);
+      if (item.note) decorate(item.id, item.note);
       if (page !== item.page) { item.page = page; moved = true; }
     }
     if (moved) store(list);
@@ -330,7 +364,7 @@
 
   const selectionSpans = () => {
     const sel = getSelection();
-    if (sel.isCollapsed) return null;
+    if (sel.isCollapsed || !sel.rangeCount) return null;
     const range = sel.getRangeAt(0);
     const page = pages().find(p => p.contains(range.commonAncestorContainer));
     if (!page) return null;
@@ -338,26 +372,61 @@
     return spans.length ? { page, spans } : null;
   };
 
-  let pendingRemove = null;  // id of the highlight whose 取消高亮 button is showing
-  const hide = () => { btn.style.display = 'none'; pendingRemove = null; };
-  const place = (r, label) => {
-    btn.textContent = label;
-    btn.style.left = (r.left + r.width / 2) + 'px';
-    btn.style.top = r.top + 'px';
-    btn.style.display = 'block';
+  // The button bar serves either the current selection ('sel') or one highlight (its id).
+  let barFor = null;
+  const hideBar = () => { bar.style.display = 'none'; barFor = null; };
+  const showBar = (r, target, actions) => {
+    bar.replaceChildren(...actions.map(([label, fn]) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.addEventListener('click', fn);
+      return b;
+    }));
+    bar.style.left = (r.left + r.width / 2) + 'px';
+    bar.style.top = Math.max(r.top, 40) + 'px';
+    bar.style.display = 'flex';
+    barFor = target;
   };
   const showFor = () => {
-    const found = selectionSpans();
-    if (found) {
-      pendingRemove = null;
-      return place(getSelection().getRangeAt(0).getBoundingClientRect(), ADD);
+    if (selectionSpans()) {
+      return showBar(getSelection().getRangeAt(0).getBoundingClientRect(), 'sel',
+        [[T.add, () => addHighlight(false)], [T.note, () => addHighlight(true)]]);
     }
-    if (!pendingRemove) hide();
+    if (barFor === 'sel') hideBar();
   };
 
-  const addHighlight = () => {
+  let editing = null;  // { id, fresh }: fresh means the note was just created from a selection
+  const openEditor = (id, fresh) => {
+    const marks = marksOf(id);
+    if (!marks.length) return;
+    editing = { id, fresh };
+    box.value = (load().find(h => h.id === id) || {}).note || '';
+    editor.style.display = 'block';
+    const r = marks[marks.length - 1].getBoundingClientRect();
+    const w = editor.offsetWidth, h = editor.offsetHeight;
+    let top = r.bottom + 6;
+    if (top + h > innerHeight - 8) top = Math.max(8, r.top - h - 6);
+    editor.style.left = Math.min(Math.max(8, r.left), innerWidth - w - 8) + 'px';
+    editor.style.top = top + 'px';
+    box.focus({ preventScroll: true });
+  };
+  // save=false is Esc: a fresh note is discarded, an existing one keeps its old text.
+  const closeEditor = save => {
+    if (!editing) return;
+    const { id, fresh } = editing;
+    editing = null;
+    editor.style.display = 'none';
+    const note = box.value.trim();
+    if (fresh && (!save || !note)) return remove(id);
+    if (!save) return;
+    update(id, { note: note || undefined });
+    decorate(id, note);
+  };
+
+  const addHighlight = withNote => {
     const found = selectionSpans();
-    if (!found) return hide();
+    if (!found) return hideBar();
     const { page, spans } = found;
     const nodes = textNodes(page);
     const flat = nodes.map(n => n.data).join('');
@@ -374,11 +443,12 @@
     wrap(spans, id);
     store([...load(), item]);
     getSelection().removeAllRanges();
-    hide();
+    hideBar();
+    if (withNote) openEditor(id, true);
   };
 
   const remove = id => {
-    document.querySelectorAll(`mark.hl[data-id="${id}"]`).forEach(m => {
+    marksOf(id).forEach(m => {
       const parent = m.parentNode;
       m.replaceWith(...m.childNodes);
       parent.normalize();
@@ -386,17 +456,38 @@
     store(load().filter(h => h.id !== id));
   };
 
-  btn.addEventListener('mousedown', e => e.preventDefault());
-  btn.addEventListener('click', () => pendingRemove ? (remove(pendingRemove), hide()) : addHighlight());
+  bar.addEventListener('mousedown', e => e.preventDefault());
+  editor.querySelector('[data-act="save"]').addEventListener('click', () => closeEditor(true));
+  editor.querySelector('[data-act="del"]').addEventListener('click', () => {
+    const { id } = editing;
+    editing = null;
+    editor.style.display = 'none';
+    remove(id);
+  });
+  // Keys typed into the note must not reach the slide navigation or the selection bar.
+  editor.addEventListener('keyup', e => e.stopPropagation());
+  editor.addEventListener('keydown', e => {
+    e.stopPropagation();
+    if (e.key === 'Escape') closeEditor(false);
+    else if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) { e.preventDefault(); closeEditor(true); }
+  });
+
   document.addEventListener('mouseup', () => setTimeout(showFor, 0));
   document.addEventListener('keyup', showFor);
-  document.addEventListener('scroll', hide, true);
+  document.addEventListener('scroll', e => {
+    if (editor.contains(e.target)) return;
+    hideBar();
+    closeEditor(true);
+  }, true);
   document.addEventListener('click', e => {
-    if (e.target === btn) return;
+    if (bar.contains(e.target) || editor.contains(e.target)) return;
+    closeEditor(true);
     const mark = e.target.closest('mark.hl');
-    if (!mark || !getSelection().isCollapsed) { pendingRemove = null; return; }
-    pendingRemove = mark.dataset.id;
-    place(mark.getBoundingClientRect(), REMOVE);
+    if (!mark || !mark.isConnected || !getSelection().isCollapsed) { if (barFor !== 'sel') hideBar(); return; }
+    const id = mark.dataset.id;
+    if (mark.classList.contains('has-note')) { hideBar(); return openEditor(id, false); }
+    showBar(mark.getBoundingClientRect(), id,
+      [[T.note, () => { hideBar(); openEditor(id, false); }], [T.remove, () => { hideBar(); remove(id); }]]);
   });
 
   restoreAll(load());
