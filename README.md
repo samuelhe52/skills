@@ -18,6 +18,17 @@ npx skills add samuelhe52/skills --skill <skill-name>
 - `remote-gpu-experiments`: Inspect remote GPU hosts, run and monitor workloads, and retrieve results over SSH or a scheduler.
 - `test-value-audit`: Assess tests' defect-detection value, maintenance cost, redundancy, and meaningful coverage gaps.
 
+## Companion CLIs
+
+These skills live in the repositories of the CLIs they drive. Install the CLI first, then the skill:
+
+- `codexctl`: Delegate work to Codex sessions on the local app-server daemon.
+  CLI: [samuelhe52/codexctl](https://github.com/samuelhe52/codexctl) (`./install.sh`).
+  Skill: `npx skills add samuelhe52/codexctl --skill codexctl`
+- `c3tl`: Delegate work to Claude Code background sessions, using codexctl's JSON protocol.
+  CLI: [samuelhe52/c3tl](https://github.com/samuelhe52/c3tl) (`./install.sh`).
+  Skill: `npx skills add samuelhe52/c3tl --skill c3tl`
+
 ## License
 
 [MIT](LICENSE)
