@@ -297,33 +297,6 @@
     addEventListener('hashchange', () => show(fromHash()));
     pages.forEach((p, i) => p.addEventListener('beforematch', () => show(i)));  // find-in-page hit on a hidden slide
 
-    // While zoomed, wheel and touch belong to the browser, which pans the slide.
-    const zoomed = () => visualViewport && visualViewport.scale > 1.01;
-
-    // Trackpads keep sending wheel events after the fingers lift, so one flick must turn one slide.
-    let acc = 0, last = 0, turned = 0, locked = false;
-    addEventListener('wheel', e => {
-      if (e.ctrlKey || zoomed() || e.target.closest?.('#hl-note')) return;
-      const quiet = e.timeStamp - last > 150;
-      last = e.timeStamp;
-      if (locked && !quiet && e.timeStamp - turned < 1200) return;
-      if (locked || quiet) acc = 0;
-      locked = false;
-      acc += e.deltaY;
-      if (Math.abs(acc) < 60) return;
-      show(cur + Math.sign(acc));
-      turned = e.timeStamp; locked = true;
-    }, { passive:true });
-
-    let touch = null;
-    addEventListener('touchstart', e => { touch = e.touches.length === 1 && !zoomed() ? e.touches[0] : null; }, { passive:true });
-    addEventListener('touchend', e => {
-      if (!touch || zoomed()) return;
-      const t = e.changedTouches[0], dx = touch.clientX - t.clientX, dy = touch.clientY - t.clientY;
-      touch = null;
-      if (Math.max(Math.abs(dx), Math.abs(dy)) > 50) show(cur + Math.sign(Math.abs(dx) > Math.abs(dy) ? dx : dy));
-    }, { passive:true });
-
     // Theme toggle. The first theme is chosen in <head>.
     const root = document.documentElement;
     const zh = root.lang.startsWith('zh');

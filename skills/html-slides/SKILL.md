@@ -85,7 +85,7 @@ KaTeX loads from a CDN, so the HTML needs network access to show math. The PDF e
 
 The deck shows one slide at a time, and the URL keeps the slide number (`#5`), so a reload stays put and a link can open a given slide.
 
-- **Move between slides:** arrow keys, PageUp and PageDown, space, Home and End, the mouse wheel or a trackpad scroll, or a swipe on a touch screen.
-- **Zoom:** pinch to zoom, then pan with a scroll. The view stays on the current slide, and the wheel turns slides again after zooming back out. Browser zoom (⌘+) doesn't enlarge a slide, because slides always fit the window.
+- **Move between slides:** arrow keys, PageUp and PageDown, space, Home and End. Scrolling and swiping do not turn slides.
+- **Zoom:** pinch to zoom, then pan with a scroll. The view stays on the current slide. Browser zoom (⌘+) doesn't enlarge a slide, because slides always fit the window.
 - **Theme:** press D or use the button at the top right. It follows the system until a choice is made, and the choice is remembered across decks.
 - **Highlights and notes:** selecting text offers both. They are saved in the presenter's browser, per file name, and survive reloads.
