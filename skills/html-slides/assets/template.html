@@ -406,7 +406,7 @@
   const pages = () => [...document.querySelectorAll('.page')];
   const textNodes = page => {
     const w = document.createTreeWalker(page, NodeFilter.SHOW_TEXT, { acceptNode: n =>
-      n.parentElement.closest('script, style') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
+      n.parentElement.closest('script, style, svg') ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT });
     const out = [];
     for (let n; (n = w.nextNode());) out.push(n);
     return out;
