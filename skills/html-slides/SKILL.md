@@ -1,6 +1,6 @@
 ---
 name: html-slides
-description: "Build, edit, render-check, or export to PDF a 16:9 HTML slide deck from a bundled template with math, charts, tables, figures, keyboard navigation, and in-browser highlights and notes. Use whenever the user wants HTML slides, a browser deck, or a talk or group-meeting presentation on any topic, including when they ask for slides and name no file format (e.g. 'make slides for my results', '做一份组会slides'). Provides the deck frame and tools; what the deck says comes from the user or the calling skill. Not for .pptx or .potx files, which the pptx skill handles."
+description: "Build, edit, render-check, or export to PDF a 16:9 HTML slide deck from a bundled template with math, charts, tables, figures, light and dark themes, zoom-safe navigation, and in-browser highlights and notes. Use whenever the user wants HTML slides, a browser deck, or a talk or group-meeting presentation on any topic, including when they ask for slides and name no file format (e.g. 'make slides for my results', '做一份组会slides'). Provides the deck frame and tools; what the deck says comes from the user or the calling skill. Not for .pptx or .potx files, which the pptx skill handles."
 ---
 
 # HTML slides
@@ -48,6 +48,12 @@ Each one appears in the template; copy the markup from there.
 | List markers | `<li class="ok">`, `no`, `q` |
 | Text styles | `.mute`, `.warn` |
 
+## Colors
+
+The template has light and dark themes, set through CSS variables on `html`. In any custom markup, use the variables instead of fixed colors, or it will break in dark mode: `--ink`, `--mute`, `--line`, `--paper` (slide), `--bg` (panel), `--card` (box inside a panel), `--blue`, `--red`, `--green`, `--amber`, `--hl`, `--neutral`, `--track`. Inline SVG can use them too, for example `style="fill:var(--ink)"`.
+
+Images keep a white background in both themes. Printed slides and PDFs are always light.
+
 ## Math
 
 Write `$...$` for inline math and `$$...$$` inside `.eq` for display math. Write `\lt` and `\gt` rather than raw angle brackets, which HTML parsing would eat.
@@ -77,4 +83,9 @@ KaTeX loads from a CDN, so the HTML needs network access to show math. The PDF e
 
 ## Presenting
 
-Arrow keys, PageUp and PageDown, and space move between slides. Selecting text offers a highlight or a note. These are saved in the presenter's browser, per file name, and survive reloads.
+The deck shows one slide at a time, and the URL keeps the slide number (`#5`), so a reload stays put and a link can open a given slide.
+
+- **Move between slides:** arrow keys, PageUp and PageDown, space, Home and End, the mouse wheel or a trackpad scroll, or a swipe on a touch screen.
+- **Zoom:** pinch to zoom, then pan with a scroll. The view stays on the current slide, and the wheel turns slides again after zooming back out. Browser zoom (⌘+) doesn't enlarge a slide, because slides always fit the window.
+- **Theme:** press D or use the button at the top right. It follows the system until a choice is made, and the choice is remembered across decks.
+- **Highlights and notes:** selecting text offers both. They are saved in the presenter's browser, per file name, and survive reloads.

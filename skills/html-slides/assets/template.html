@@ -7,15 +7,32 @@
 <title>DECK TITLE</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.css">
+<script>
+  // Set the theme before first paint. A choice made with the toggle wins; otherwise follow the system.
+  (() => {
+    let saved = null;
+    try { saved = localStorage.getItem('slides-theme'); } catch {}
+    document.documentElement.dataset.theme = saved || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  })();
+</script>
 <style>
   :root { --ink:#1d2433; --mute:#5b6478; --line:#d9dde6; --bg:#f6f7fa; --blue:#2450c8; --red:#c23b3b; --green:#2b8a5a; --amber:#b7791f;
-          --hl:#2a78d6; --neutral:#a9afbd; --track:#e8eaf0; }
+          --hl:#2a78d6; --neutral:#a9afbd; --track:#e8eaf0; --page:#e9ebf0; --paper:#fff; --card:#fff; --mark:#ffe58a; --mark-note:#d6e6ff; }
+  /* Screen only, so printed slides and PDFs stay light. */
+  @media screen {
+    html[data-theme="dark"] { color-scheme:dark; --ink:#e3e7ef; --mute:#9ba4b9; --line:#323a4c; --bg:#1a2030; --blue:#7ea8ff; --red:#ff7f7f; --green:#5fd49c; --amber:#f2b45a;
+            --hl:#4d8fe8; --neutral:#7b8498; --track:#2a3244; --page:#070a10; --paper:#111620; --card:#222a3a; --mark:#4f430f; --mark-note:#25406e; }
+  }
   * { box-sizing:border-box; margin:0; padding:0; }
-  html { scroll-snap-type:y mandatory; background:#e9ebf0; }
+  html { background:var(--page); }
   body { font-family:-apple-system,"Helvetica Neue",Inter,"Segoe UI","PingFang SC","Microsoft YaHei","Noto Sans CJK SC",sans-serif; color:var(--ink); }
-  .page { height:100vh; display:flex; align-items:center; justify-content:center; scroll-snap-align:center; }
+  /* One slide at a time, with nothing to scroll: pinch zoom pans inside the slide and cannot reach another one.
+     Hidden slides leave the flow but stay searchable through hidden="until-found". */
+  .page { height:100vh; display:flex; align-items:center; justify-content:center; }
+  .page[hidden] { position:fixed; inset:0; pointer-events:none; }
+  .page[hidden=""] { display:none; }
   /* 16:9 slide scaled to the viewport */
-  .slide { width:min(100vw, 177.78vh); aspect-ratio:16/9; background:#fff; padding:2.4vw 3vw 1.4vw; display:grid;
+  .slide { width:min(100vw, 177.78vh); aspect-ratio:16/9; background:var(--paper); padding:2.4vw 3vw 1.4vw; display:grid;
            grid-template-rows:auto 1fr auto; gap:1.2vw; font-size:min(1.1vw, 1.96vh); line-height:1.45; box-shadow:0 4px 30px #0002; }
   header h1 { font-size:2.1em; letter-spacing:-.005em; line-height:1.25; }
   header p { color:var(--mute); margin-top:.3em; font-size:1.05em; }
@@ -33,16 +50,16 @@
   .warn { color:var(--amber); font-weight:650; }
   code { font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.88em; }
   /* verbatim text block; <i> marks placeholders */
-  .prompt { background:#fff; border:1px solid var(--line); border-radius:.4vw; padding:.6em .8em; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.9em; line-height:1.5; }
+  .prompt { background:var(--card); border:1px solid var(--line); border-radius:.4vw; padding:.6em .8em; font-family:"SF Mono",Menlo,Consolas,monospace; font-size:.9em; line-height:1.5; }
   .prompt i { color:var(--blue); font-style:normal; }
   /* display equation: <div class="eq">$$...$$<span class="lbl">(n)</span></div> */
-  .eq { background:#fff; border-left:3px solid var(--blue); padding:.1em .8em; margin:.45em 0 .6em; position:relative; }
+  .eq { background:var(--card); border-left:3px solid var(--blue); padding:.1em .8em; margin:.45em 0 .6em; position:relative; }
   .eq .katex-display { margin:.45em 0; }
   .eq .lbl { position:absolute; right:.7em; top:50%; transform:translateY(-50%); color:var(--mute); font-size:.85em; }
   .katex { font-size:1.05em; }
   /* two roles / data flow */
   .flow { display:grid; grid-template-columns:1fr auto 1fr; align-items:center; gap:.8em; text-align:center; }
-  .role { background:#fff; border:2px solid var(--line); border-radius:.5vw; padding:.7em .5em; }
+  .role { background:var(--card); border:2px solid var(--line); border-radius:.5vw; padding:.7em .5em; }
   .role b { display:block; font-size:1.1em; margin-bottom:.2em; }
   .role.t { border-color:var(--green); } .role.s { border-color:var(--red); }
   .arrow { color:var(--mute); font-size:.9em; line-height:1.3; }
@@ -58,7 +75,7 @@
   td.bad { color:var(--red); }
   .cap { color:var(--mute); font-size:.85em; margin-top:.5em; }
   /* numbered pseudocode */
-  .algo { font-size:.92em; line-height:1.55; background:#fff; border:1px solid var(--line); border-radius:.4vw; padding:.7em .9em; counter-reset:ln; }
+  .algo { font-size:.92em; line-height:1.55; background:var(--card); border:1px solid var(--line); border-radius:.4vw; padding:.7em .9em; counter-reset:ln; }
   .algo div { counter-increment:ln; padding-left:2.2em; text-indent:-2.2em; }
   .algo div::before { content:counter(ln); display:inline-block; width:2.2em; text-indent:0; color:var(--mute); }
   .algo .in1 { padding-left:3.6em; text-indent:-3.6em; } .algo .in1::before { width:3.6em; }
@@ -82,18 +99,22 @@
   .kpi .l { color:var(--mute); font-size:.95em; margin-top:.2em; }
   /* chain of steps with math / assumption / empirical tags */
   .chain { display:grid; grid-template-columns:1fr auto 1fr auto 1fr; gap:.8em; align-items:stretch; }
-  .chain .step { background:#fff; border:1px solid var(--line); border-radius:.5vw; padding:.6em .8em; }
+  .chain .step { background:var(--card); border:1px solid var(--line); border-radius:.5vw; padding:.6em .8em; }
   .chain .step b { display:block; color:var(--blue); margin-bottom:.2em; }
   .chain .op { align-self:center; color:var(--mute); font-size:1.3em; }
-  .tagm { display:inline-block; padding:0 .45em; border-radius:.3em; font-size:.78em; font-weight:650; color:#fff; vertical-align:.1em; margin-left:.3em; }
+  .tagm { display:inline-block; padding:0 .45em; border-radius:.3em; font-size:.78em; font-weight:650; color:var(--paper); vertical-align:.1em; margin-left:.3em; }
   .tagm.math { background:var(--green); } .tagm.assume { background:var(--amber); } .tagm.emp { background:var(--mute); }
   /* figure: <figure class="fig"><img src="deck-slug-figs/fig2.png" alt="…"><figcaption>…</figcaption></figure> */
   .fig { margin:0; display:flex; flex-direction:column; min-height:0; height:100%; }
+  /* stays white in dark mode: figures are usually drawn for a white background */
   .fig img { flex:1; min-height:0; width:100%; object-fit:contain; background:#fff; border:1px solid var(--line); border-radius:.4vw; }
   .fig figcaption { color:var(--mute); font-size:.85em; margin-top:.4em; }
   .fig figcaption b { color:var(--ink); }
   /* list markers: check, cross, question */
   .ok::before { content:"✓"; color:var(--green); } .no::before { content:"✗"; color:var(--red); } .q::before { content:"?"; color:var(--amber); font-weight:700; }
+  .theme-toggle { position:fixed; right:14px; top:12px; z-index:10; font:inherit; font-size:12px; padding:.35em .8em; border:1px solid var(--line); border-radius:999px;
+                  background:var(--card); color:var(--ink); cursor:pointer; opacity:.45; }
+  .theme-toggle:hover { opacity:1; }
   footer { display:flex; justify-content:space-between; color:var(--mute); font-size:.78em; border-top:1px solid var(--line); padding-top:.5vw; }
   .title .slide { grid-template-rows:1fr auto auto; }
   .title h1 { font-size:3.1em; line-height:1.15; letter-spacing:-.01em; }
@@ -103,7 +124,8 @@
   @media print {
     @page { size:16in 9in; margin:0; }
     html { background:#fff; }
-    .page { height:auto; page-break-after:always; }
+    .theme-toggle { display:none; }
+    .page, .page[hidden] { display:flex !important; position:static; height:auto; content-visibility:visible; page-break-after:always; }
     .slide { width:16in; height:9in; font-size:16px; box-shadow:none; padding:34px 42px 20px; gap:16px; }
   }
 </style>
@@ -258,6 +280,87 @@
   <footer><span>Footer text</span><span>7</span></footer>
 </div></div>
 
+<script>
+  // Navigation comes before the KaTeX scripts so a slow or failed CDN cannot break it.
+  (() => {
+    const pages = [...document.querySelectorAll('.page')];
+    const hide = 'onbeforematch' in document.body ? 'until-found' : '';
+    let cur = 0;
+    function show(i) {
+      cur = Math.min(pages.length - 1, Math.max(0, i));
+      pages.forEach((p, k) => k === cur ? p.removeAttribute('hidden') : p.setAttribute('hidden', hide));
+      try { history.replaceState(null, '', '#' + (cur + 1)); } catch {}
+      document.dispatchEvent(new Event('slidechange'));
+    }
+    const fromHash = () => (parseInt(location.hash.slice(1), 10) || 1) - 1;
+    show(fromHash());
+    addEventListener('hashchange', () => show(fromHash()));
+    pages.forEach((p, i) => p.addEventListener('beforematch', () => show(i)));  // find-in-page hit on a hidden slide
+
+    // While zoomed, wheel and touch belong to the browser, which pans the slide.
+    const zoomed = () => visualViewport && visualViewport.scale > 1.01;
+
+    // Trackpads keep sending wheel events after the fingers lift, so one flick must turn one slide.
+    let acc = 0, last = 0, turned = 0, locked = false;
+    addEventListener('wheel', e => {
+      if (e.ctrlKey || zoomed() || e.target.closest?.('#hl-note')) return;
+      const quiet = e.timeStamp - last > 150;
+      last = e.timeStamp;
+      if (locked && !quiet && e.timeStamp - turned < 1200) return;
+      if (locked || quiet) acc = 0;
+      locked = false;
+      acc += e.deltaY;
+      if (Math.abs(acc) < 60) return;
+      show(cur + Math.sign(acc));
+      turned = e.timeStamp; locked = true;
+    }, { passive:true });
+
+    let touch = null;
+    addEventListener('touchstart', e => { touch = e.touches.length === 1 && !zoomed() ? e.touches[0] : null; }, { passive:true });
+    addEventListener('touchend', e => {
+      if (!touch || zoomed()) return;
+      const t = e.changedTouches[0], dx = touch.clientX - t.clientX, dy = touch.clientY - t.clientY;
+      touch = null;
+      if (Math.max(Math.abs(dx), Math.abs(dy)) > 50) show(cur + Math.sign(Math.abs(dx) > Math.abs(dy) ? dx : dy));
+    }, { passive:true });
+
+    // Theme toggle. The first theme is chosen in <head>.
+    const root = document.documentElement;
+    const zh = root.lang.startsWith('zh');
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'theme-toggle';
+    document.body.appendChild(btn);
+    function setTheme(t) {
+      root.dataset.theme = t;
+      btn.textContent = t === 'dark' ? (zh ? '☀ 浅色 (D)' : '☀ Light (D)') : (zh ? '☾ 深色 (D)' : '☾ Dark (D)');
+    }
+    setTheme(root.dataset.theme);
+    btn.addEventListener('click', () => {
+      const t = root.dataset.theme === 'dark' ? 'light' : 'dark';
+      try { localStorage.setItem('slides-theme', t); } catch {}
+      setTheme(t);
+      btn.blur();  // otherwise space would press the button again instead of turning the slide
+    });
+    matchMedia('(prefers-color-scheme: dark)').addEventListener('change', e => {
+      let saved = null;
+      try { saved = localStorage.getItem('slides-theme'); } catch {}
+      if (!saved) setTheme(e.matches ? 'dark' : 'light');
+    });
+
+    document.addEventListener('keydown', e => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return;
+      if (e.key === 'd' || e.key === 'D') return btn.click();
+      if (e.shiftKey) return;  // Shift+arrows extend a text selection
+      const to = ['ArrowRight','ArrowDown','PageDown',' '].includes(e.key) ? cur + 1
+               : ['ArrowLeft','ArrowUp','PageUp'].includes(e.key) ? cur - 1
+               : e.key === 'Home' ? 0 : e.key === 'End' ? pages.length - 1 : null;
+      if (to === null) return;
+      e.preventDefault();
+      show(to);
+    });
+  })();
+</script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/katex.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.11/dist/contrib/auto-render.min.js"></script>
 <script>
@@ -265,35 +368,23 @@
     delimiters: [ { left:'$$', right:'$$', display:true }, { left:'$', right:'$', display:false } ],
     throwOnError: false
   });
-  // Arrow keys / PageUp / PageDown / space move one slide.
-  const pages = [...document.querySelectorAll('.page')];
-  const current = () => pages.reduce((best, p, i) =>
-    Math.abs(p.getBoundingClientRect().top) < Math.abs(pages[best].getBoundingClientRect().top) ? i : best, 0);
-  document.addEventListener('keydown', e => {
-    const fwd = ['ArrowRight','ArrowDown','PageDown',' '].includes(e.key);
-    const back = ['ArrowLeft','ArrowUp','PageUp'].includes(e.key);
-    if ((!fwd && !back) || e.shiftKey) return;  // Shift+arrows extend a text selection
-    e.preventDefault();
-    const i = Math.min(pages.length - 1, Math.max(0, current() + (fwd ? 1 : -1)));
-    pages[i].scrollIntoView({ behavior:'smooth', block:'center' });
-  });
 </script>
 <!-- Select text to highlight it or attach a note; click a highlight or note to edit or remove it. Saved per browser in localStorage. -->
 <style>
-  mark.hl { background:#ffe58a; color:inherit; border-radius:2px; cursor:pointer; }
-  mark.hl.has-note { background:#d6e6ff; box-shadow:inset 0 -2px 0 #5b8def; }
+  mark.hl { background:var(--mark); color:inherit; border-radius:2px; cursor:pointer; }
+  mark.hl.has-note { background:var(--mark-note); box-shadow:inset 0 -2px 0 #5b8def; }
   mark.hl.note-end::after { content:'✎'; margin-left:1px; font-size:.7em; vertical-align:super; color:#3f6fd8; }
-  #hl-bar { position:fixed; display:none; transform:translate(-50%, -100%); margin-top:-8px; border-radius:6px; overflow:hidden; background:#1d2433; z-index:1000; }
+  #hl-bar { position:fixed; display:none; transform:translate(-50%, -100%); margin-top:-8px; border-radius:6px; overflow:hidden; background:#1d2433; border:1px solid #3a4459; z-index:1000; }
   #hl-bar button { padding:4px 12px; border:0; background:none; color:#fff; font:13px -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; cursor:pointer; }
   #hl-bar button + button { border-left:1px solid #3a4459; }
   #hl-bar button:hover { background:#2e3850; }
-  #hl-note { position:fixed; display:none; width:300px; padding:8px; background:#fff; border:1px solid #c9d2e3; border-radius:8px;
+  #hl-note { position:fixed; display:none; width:300px; padding:8px; background:var(--card); color:var(--ink); border:1px solid var(--line); border-radius:8px;
              box-shadow:0 6px 20px rgba(0,0,0,.18); z-index:1001; font:13px/1.5 -apple-system,"PingFang SC","Microsoft YaHei",sans-serif; }
   #hl-note textarea { display:block; width:100%; box-sizing:border-box; min-height:80px; padding:6px; resize:vertical;
-                      border:1px solid #c9d2e3; border-radius:4px; font:inherit; color:#1d2433; }
+                      border:1px solid var(--line); border-radius:4px; font:inherit; color:var(--ink); background:var(--paper); }
   #hl-note .row { display:flex; justify-content:flex-end; gap:6px; margin-top:6px; }
-  #hl-note button { padding:3px 12px; border:1px solid #c9d2e3; border-radius:4px; background:#fff; font:inherit; cursor:pointer; }
-  #hl-note button[data-act="save"] { border-color:#1d2433; background:#1d2433; color:#fff; }
+  #hl-note button { padding:3px 12px; border:1px solid var(--line); border-radius:4px; background:var(--card); color:var(--ink); font:inherit; cursor:pointer; }
+  #hl-note button[data-act="save"] { border-color:var(--ink); background:var(--ink); color:var(--paper); }
   @media print { #hl-bar, #hl-note { display:none !important; } mark.hl.note-end::after { content:none; } }
 </style>
 <div id="hl-bar"></div>
@@ -509,11 +600,7 @@
 
   document.addEventListener('mouseup', () => setTimeout(showFor, 0));
   document.addEventListener('keyup', showFor);
-  document.addEventListener('scroll', e => {
-    if (editor.contains(e.target)) return;
-    hideBar();
-    closeEditor(true);
-  }, true);
+  document.addEventListener('slidechange', () => { getSelection().removeAllRanges(); hideBar(); closeEditor(true); });
   document.addEventListener('click', e => {
     if (bar.contains(e.target) || editor.contains(e.target)) return;
     closeEditor(true);
