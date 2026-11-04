@@ -1,5 +1,5 @@
 #!/bin/bash
-# Render a paper-walkthrough deck and check it.
+# Render an HTML slide deck and check it.
 # Usage: render_check.sh <deck.html> [out-dir]   (default out-dir: ./tmp/render-<deck-name>)
 # Prints KaTeX formula/error counts, prints the deck to PDF (one slide per page),
 # rasterizes every page, and writes 2x2 contact sheets for visual review.
@@ -33,7 +33,8 @@ formulas=$({ grep -o 'class="katex"' "$out/dom.html" || true; } | wc -l | tr -d 
 errors=$({ grep -o 'katex-error' "$out/dom.html" || true; } | wc -l | tr -d ' ')
 echo "katex formulas: $formulas"
 echo "katex errors:   $errors"
-if [ "$formulas" = "0" ] && grep -q '\$' "$deck"; then
+# Search only the slides: the template's CSS comments and KaTeX setup contain $ delimiters.
+if [ "$formulas" = "0" ] && sed -n '/<body>/,/<script/p' "$deck" | grep -q '\$'; then
   echo "WARNING: no formulas rendered; KaTeX may have failed to load (network?)"
 fi
 

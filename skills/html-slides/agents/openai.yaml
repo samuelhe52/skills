@@ -1,0 +1,4 @@
+interface:
+  display_name: "HTML Slides"
+  short_description: "Build and check a 16:9 HTML slide deck from a bundled template"
+  default_prompt: "Use $html-slides to build an HTML slide deck and run its render check."

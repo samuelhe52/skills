@@ -1,18 +1,22 @@
 ---
 name: paper-walkthrough-slides
-description: "Turn a research paper into an HTML slide deck that walks through its argument — motivation, method, theory, experiments, ablations, limitations — using the paper's key figures, rendered math, and charts of its numbers, and closes with a summary and critique. Produces English, Chinese, or both, plus a PDF on request. Use this whenever the user wants slides, a deck, a talk, or a group-meeting presentation about a paper or arXiv link (e.g. 'read this paper and give me an html slide', '把这篇论文做成slides', 'make a Chinese version of the paper slides'), even if they don't say 'walkthrough'. Not for slides about the user's own results or for Markdown paper summaries."
+description: "Turn a research paper into an HTML slide deck that walks through its argument — motivation, method, theory, experiments, ablations, limitations — using the paper's key figures, rendered math, and charts of its numbers, and closes with a summary and critique. Produces English, Chinese, or both, plus a PDF on request. Use this whenever the user wants slides, a deck, a talk, or a group-meeting presentation about a paper or arXiv link (e.g. 'read this paper and give me an html slide', '把这篇论文做成slides', 'make a Chinese version of the paper slides'), even if they don't say 'walkthrough'. Requires the html-slides skill. Not for slides about the user's own results (use html-slides) or for Markdown paper summaries."
 ---
 
 # Paper walkthrough slides
 
-Build a self-contained HTML deck that lets someone who hasn't read the paper follow its argument and judge its evidence in a 15–30 minute talk. It works for any ML paper: an architecture paper, a training method, a theory paper, a benchmark, a systems paper. Let the paper's own logic decide which slides it needs.
+Build an HTML deck that lets someone who hasn't read the paper follow its argument and judge its evidence in a 15–30 minute talk. It works for any ML paper: an architecture paper, a training method, a theory paper, a benchmark, a systems paper. Let the paper's own logic decide which slides it needs.
 
 The audience is researchers, so faithfulness comes first. Every number and figure comes from the paper. Anything you add — a derivation step the paper skips, an interpretation, a criticism — is visibly marked as yours. The closing summary and critique is where your judgment goes, kept apart from the walkthrough.
+
+## Requires html-slides
+
+This skill decides what the deck says. The `html-slides` skill provides the template, components, and render check. Load it before writing the deck. If it isn't installed, stop and tell the user to run `npx skills add samuelhe52/skills --skill html-slides`.
 
 ## Inputs
 
 - **Paper:** an arXiv ID or URL, a local PDF, or a paper already in the conversation.
-- **Language:** English, Chinese, or both. Default to the language the user writes in. For Chinese, follow `references/zh-terminology.md`: keep terms in English when they have no settled Chinese translation.
+- **Language:** English, Chinese, or both. Default to the language the user writes in. For Chinese, follow the terminology guide in `html-slides`.
 - **Location:** the user's path or the project's convention (for example an existing `docs/slides/`). Otherwise `slides/paper-<slug>.html`, with `-zh` added for Chinese, and the extracted figures in `slides/paper-<slug>-figs/`.
 - **Focus:** if the user cares about a particular question (why the method works, how it scales, how it compares with something they use), give it dedicated slides.
 
@@ -59,25 +63,18 @@ A typical empirical paper maps to the sequence below. Adapt it: a theory paper s
 
 ### 3. Write the deck
 
-Start from `assets/template.html`. It has the slide frame (16:9, viewport scaling, arrow-key navigation, text highlights and notes that the presenter's browser remembers across reloads, print CSS with one slide per PDF page), KaTeX, and components: stat tiles, panels, equations, pseudocode, an argument chain, figures, bar charts, tables, and critique markers. Reusing these keeps decks consistent from paper to paper.
+Start from the `html-slides` template and follow that skill's rules for structure, components, math, and charts. Take the title and closing slides from `assets/paper-slides.html`.
 
 - **Headlines state the finding** ("Linear attention matches softmax up to 1.3B parameters", not "Results"). The subtitle gives the context needed to read the slide. Each footer cites its source (section, table, figure, equation) and the slide number.
 - **Figures from the paper:** include them when they carry information a chart or bullet can't — architecture and pipeline diagrams, qualitative samples, curves whose shape is the result, and any figure the paper's argument hinges on. Show each at a readable size and caption it "Figure N in the paper", plus a sentence on what to look at. When a result is tabulated, a native bar chart or table is usually clearer than a screenshot. When a result exists only as a plot, show the plot rather than estimating values from it.
-- **Charts** use one highlight color for the paper's method and neutral gray for everything else, with every value labeled, a black tick for a reference value such as the base model, and the axis range stated in a caption. Compute bar widths from the values.
-- **Math:** write `$...$` for inline and `$$...$$` inside `<div class="eq">` for display math. Write `\lt` and `\gt` rather than raw angle brackets, which HTML parsing would eat. Keep the paper's notation.
+- **Charts:** the paper's method gets the highlight, and a black tick marks a reference value such as the base model.
 - **Mark your additions and the discrepancies** (`.warn`) where readers would otherwise take them as the paper's own content.
 - **Large tables:** when highlighting cells by a rule (for example drops of more than 5 points), compute which cells qualify with a short script.
 - **Both languages:** finish and check one deck, translate it with the same structure, then compare the numbers across the two files with a script.
 
 ### 4. Render and check
 
-```bash
-bash <skill-dir>/scripts/render_check.sh path/to/deck.html [out-dir]
-```
-
-The script reports rendered formulas and KaTeX errors, prints the PDF (and warns if the page count differs from the slide count, which usually means a slide overflowed), rasterizes the pages, and writes 2×2 contact sheets. Look at every sheet, and at formula- or figure-heavy slides at higher resolution. Fix overflow, collisions, and unreadable figures, and rerun until it's clean.
-
-It needs Chrome or Chromium, poppler, and Pillow for the contact sheets. KaTeX loads from a CDN, so the HTML needs network access to show math. The exported PDF embeds the fonts and figures and works offline; copy it next to the HTML when the user wants a PDF.
+Run the render check from `html-slides` and fix what it finds, as that skill describes. Copy the PDF next to the HTML when the user wants one.
 
 ### 5. Hand off
 
