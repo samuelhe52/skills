@@ -9,7 +9,9 @@ This skill provides a slide frame, components, and a render check. It has no opi
 
 ## Start a deck
 
-Copy `assets/template.html` to the deck's path, then replace the example slides. Keep the CSS and scripts. The examples show the components and are not a suggested slide order.
+Copy `assets/template.html` to the deck's path, then replace the example slides. The examples show the components and are not a suggested slide order.
+
+The slides sit between `<!-- SLIDES:BEGIN … -->` and `<!-- SLIDES:END -->`. Everything after the end marker is the deck's runtime: navigation, theme toggle, line charts, KaTeX, and highlights. Change only what lies between the markers, and leave the runtime byte for byte as it is. When a script writes the slides, it must find the two marker comments and replace exactly the text between them. Never cut at HTML patterns such as the last `</div></div>`, which also occur inside the runtime. `render_check.sh` fails a deck whose runtime differs from the template's.
 
 Use the user's path or the project's convention. Otherwise write `slides/<slug>.html`, add `-zh` for Chinese, and put images in `slides/<slug>-figs/`.
 
@@ -40,6 +42,7 @@ Each one appears in the template; copy the markup from there.
 | Display equation | `<div class="eq">$$...$$<span class="lbl">(1)</span></div>` |
 | Figure | `<figure class="fig">` with `<img>` and `<figcaption>`, in a `<section style="display:flex;flex-direction:column">` |
 | Bar chart | `.chart` holding `.bar` rows, then `.legend` |
+| Line chart | `<div class="lchart"><script type="application/json">{spec}</script></div>`; the runtime draws it |
 | Table | `<table>`; rows `.ours` (highlight) and `.basel` (muted); cells `.bad` (red); `th.grp` for column groups; `.cap` for the caption |
 | Pseudocode | `.algo`, one `<div>` per numbered line; `.in1` and `.in2` indent; `.cm` for comments |
 | Two-box flow | `.flow` holding `.role`, `.arrow`, `.role`; `.role.t` is green, `.role.s` is red |
@@ -60,6 +63,10 @@ Write `$...$` for inline math and `$$...$$` inside `.eq` for display math. Write
 
 ## Charts
 
+Use bars to compare a few values and lines to show change over a series such as training steps. Do not hand-draw SVG charts: the line chart below handles both themes, scaling, and label placement.
+
+### Bars
+
 Add `.hl` to the bar for the deck's subject; other bars stay neutral gray. Label every value, and state the axis range in `.legend`. A `.ref` tick marks a reference value.
 
 Compute widths from the values, with a short script when there are many:
@@ -67,15 +74,33 @@ Compute widths from the values, with a short script when there are many:
 - **Plain bars:** `.fill` width and `.ref` left are the value's percentage of the axis range.
 - **Diverging bars:** a negative bar's width is `|value| / axis max`, as a percentage of its half of the track. A positive bar's width is half that, because it is a percentage of the whole track.
 
+### Lines
+
+Write the data as JSON inside the `.lchart` element; see the template's line chart slide. The spec fields are listed in a comment above the renderer in the template's runtime.
+
+- **Series:** `points` as `[[x, y], …]` in data units. Give the subject `"color":"hl"` and comparisons `"neutral"`, or use `"dash":true` to tell lines apart. A run shown as single points takes `"line":false`, plus `"hollow":true` when it is incomplete or only suggestive.
+- **Labels:** label the values the slide talks about, such as start, end, peak, and any point the text cites, rather than every point. Each label goes `"above"` its point unless `pos` says otherwise. If that spot hits a line, a point, a tick label, or another label, the runtime moves the label. A label that fits nowhere logs `lchart:` to the console, and the render check fails.
+- **Axes:** set `x`, `y`, `xticks`, and `yticks`, and use `yfmt` such as `"{}%"` for units. A y range that starts above zero gets an axis break mark and a "truncated" note in the legend automatically. Use a truncated axis only when the differences that matter would otherwise be invisible.
+- **Size:** to fill a panel, give the `<section>` `style="display:flex;flex-direction:column"` and the chart `style="flex:1;min-height:0"`. Otherwise its height is its width divided by `aspect` (default 1.75). Text scales with the slide.
+
 ## Render and check
 
 ```bash
 bash <skill-dir>/scripts/render_check.sh path/to/deck.html [out-dir]
 ```
 
-The script reports rendered formulas and KaTeX errors, prints the PDF (and warns if the page count differs from the slide count, which usually means a slide overflowed), rasterizes the pages, and writes 2×2 contact sheets. It exits nonzero on KaTeX errors.
+The script:
 
-Look at every sheet, and at formula- or figure-heavy slides at higher resolution. Fix overflow, collisions, and unreadable figures, and rerun until it's clean.
+- checks that the code after `<!-- SLIDES:END -->` matches the template's.
+- loads the deck in a live browser and checks that slides show one at a time, that the theme toggle, highlight UI, and every line chart exist, and that the console has no script errors or `lchart:` warnings.
+- reports rendered formulas and KaTeX errors.
+- prints the PDF in the light theme, and warns if the page count differs from the slide count, which usually means a slide overflowed.
+- screenshots every slide in the dark theme.
+- writes 2×2 contact sheets: `sheetN.png` for light and `dark-sheetN.png` for dark.
+
+It exits nonzero on any error. A passing PDF alone does not show that the deck works in a browser, because print shows every slide whether or not navigation runs.
+
+Look at every light and dark sheet, and open the full-size `p-NN.png` and `d-NN.png` for slides with charts, formulas, or figures. Fix overflow, collisions, and unreadable figures, and rerun until it's clean. Report a check as passed only when this run passed it.
 
 It needs Chrome or Chromium, poppler, and Pillow for the contact sheets. The PDF lands in the output directory; copy it next to the HTML when the user wants one.
 

@@ -92,6 +92,10 @@
   .bar .ref { position:absolute; top:-.2em; bottom:-.2em; width:2px; background:var(--ink); opacity:.55; }
   .bar:hover .fill { filter:brightness(.9); }
   .legend { font-size:.82em; color:var(--mute); margin-top:.3em; }
+  /* line charts: <div class="lchart"><script type="application/json">{spec}</script></div>, drawn by the runtime */
+  .lchart svg.lchart-svg { width:100%; height:auto; display:block; overflow:visible; }
+  .lchart .legend { display:flex; flex-wrap:wrap; gap:.3em 1.4em; align-items:center; }
+  .lchart .legend svg { width:2em; height:.8em; vertical-align:middle; margin-right:.35em; }
   /* stat tiles */
   .key { display:grid; grid-template-columns:repeat(3,1fr); gap:1.2vw; }
   .kpi { background:var(--bg); border-radius:.7vw; padding:1vw 1.2vw; }
@@ -131,6 +135,8 @@
 </style>
 </head>
 <body>
+
+<!-- SLIDES:BEGIN — slides go between this marker and the end marker below. Everything after the end marker is the deck's runtime; leave it byte-for-byte as in the template. -->
 
 <!-- Title slide -->
 <div class="page title"><div class="slide">
@@ -280,6 +286,147 @@
   <footer><span>Footer text</span><span>7</span></footer>
 </div></div>
 
+<!-- Line chart: write data as JSON; the runtime draws the SVG, places labels off the lines, and writes the legend -->
+<div class="page"><div class="slide">
+  <header><h1>Slide headline</h1>
+    <p>Subtitle line.</p></header>
+  <div class="body c2">
+    <section style="display:flex;flex-direction:column">
+      <h2>Line chart</h2>
+      <div class="lchart" style="flex:1;min-height:0"><script type="application/json">
+{ "x":[0,100], "y":[0,100], "xticks":[0,25,50,75,100], "yticks":[0,25,50,75,100], "yfmt":"{}%", "xlabel":"Training step",
+  "series":[
+    { "name":"Subject", "color":"hl", "points":[[0,8],[25,30],[50,52],[75,66],[100,71]] },
+    { "name":"Comparison", "color":"neutral", "dash":true, "points":[[0,8],[25,20],[50,33],[75,41],[100,44]] },
+    { "name":"Reference run", "color":"amber", "line":false, "hollow":true, "points":[[50,24]] } ],
+  "labels":[ { "at":[100,71], "text":"71%", "color":"hl" }, { "at":[0,8], "text":"8%", "color":"hl" },
+             { "at":[50,24], "text":"Reference 24%", "color":"amber", "pos":"right" } ] }
+      </script></div>
+    </section>
+    <section style="display:flex;flex-direction:column">
+      <h2>Truncated y axis</h2>
+      <div class="lchart" style="flex:1;min-height:0"><script type="application/json">
+{ "x":[0,80], "y":[60,80], "xticks":[0,20,40,60,80], "yticks":[60,65,70,75,80], "yfmt":"{}%",
+  "series":[ { "name":"Retention", "color":"hl", "points":[[0,73],[20,70],[40,71],[80,70]] } ],
+  "labels":[ { "at":[0,73], "text":"73%", "color":"hl" }, { "at":[80,70], "text":"70%", "color":"hl" } ],
+  "note":"A y axis that starts above zero gets a break mark and a legend note automatically." }
+      </script></div>
+    </section>
+  </div>
+  <footer><span>Footer text</span><span>8</span></footer>
+</div></div>
+
+<!-- SLIDES:END -->
+
+<script>
+  // Line charts. Runs before navigation hides slides, so every chart can be measured.
+  // Spec: x, y ([min,max]); xticks, yticks; xfmt, yfmt ("{}%"); xlabel; aspect (width/height, default 1.75);
+  // series [{name, color, points:[[x,y],...], dash, hollow, line:false}]; labels [{at:[x,y], text, color, pos, dx, dy}]; note.
+  // Height: W/aspect, unless the box is stretched by layout (style="flex:1;min-height:0" in a flex-column section); then it fills the box.
+  // Colors are theme variable names (hl, neutral, blue, red, green, amber, mute, ink).
+  // A label is moved off lines, points, and other labels when its requested spot collides; one that can't be placed logs "lchart:".
+  (() => {
+    const NS = 'http://www.w3.org/2000/svg';
+    const zh = document.documentElement.lang.startsWith('zh');
+    const mk = (tag, attrs, parent, text) => {
+      const e = document.createElementNS(NS, tag);
+      for (const k in attrs) e.setAttribute(k, attrs[k]);
+      if (text != null) e.textContent = text;
+      if (parent) parent.appendChild(e);
+      return e;
+    };
+    const col = c => `var(--${c || 'hl'})`;
+    const OFF = { above:[0,-11,'middle'], below:[0,21,'middle'], right:[10,5,'start'], left:[-10,5,'end'],
+                  'above-right':[7,-10,'start'], 'above-left':[-7,-10,'end'], 'below-right':[7,20,'start'], 'below-left':[-7,20,'end'] };
+    document.querySelectorAll('.lchart').forEach((box, n) => {
+      let s;
+      try { s = JSON.parse(box.querySelector('script[type="application/json"]').textContent); }
+      catch (err) {
+        console.error(`lchart: chart ${n + 1} has an invalid JSON spec: ${err.message}`);
+        box.insertAdjacentHTML('beforeend', '<p style="color:var(--red)">lchart: invalid JSON spec</p>');
+        return;
+      }
+      const slide = box.closest('.slide');
+      const k = 1280 / slide.getBoundingClientRect().width;  // screen px -> units of a 1280-px-wide slide
+      const items = (s.series || []).filter(se => se.name).map(se =>
+        `<span><svg viewBox="0 0 24 10"><line x1="1" x2="23" y1="5" y2="5" style="stroke:${se.line === false ? 'none' : col(se.color)};stroke-width:2.6;${se.dash ? 'stroke-dasharray:5 3' : ''}"/>` +
+        `<circle cx="12" cy="5" r="3.4" style="fill:${se.hollow ? 'var(--bg)' : col(se.color)};stroke:${col(se.color)};stroke-width:1.6"/></svg>${se.name}</span>`);
+      if (s.y[0] > 0) items.push(`<span>${zh ? `y 轴从 ${(s.yfmt || '{}').replace('{}', s.y[0])} 起（截断）` : `y axis starts at ${(s.yfmt || '{}').replace('{}', s.y[0])} (truncated)`}</span>`);
+      if (s.note) items.push(`<span>${s.note}</span>`);
+      const boxH = box.getBoundingClientRect().height * k;
+      let legendH = 0;
+      if (items.length) {
+        box.insertAdjacentHTML('beforeend', `<p class="legend">${items.join('')}</p>`);
+        const lg = box.lastElementChild;
+        legendH = (lg.getBoundingClientRect().height + parseFloat(getComputedStyle(lg).marginTop)) * k;
+      }
+      const W = Math.round(box.getBoundingClientRect().width * k) || 560;
+      const H = boxH > 60 ? Math.round(boxH - legendH - 2) : Math.round(W / (s.aspect || 1.75));
+      const fx = v => (s.xfmt || '{}').replace('{}', v), fy = v => (s.yfmt || '{}').replace('{}', v);
+      const [x0, x1] = s.x, [y0, y1] = s.y, yt = s.yticks || s.y, xt = s.xticks || s.x;
+      const L = 14 + 8 * Math.max(...yt.map(v => fy(v).length)), R = 14, T = 12, B = s.xlabel ? 48 : 30;
+      const X = v => L + (v - x0) / (x1 - x0) * (W - L - R), Y = v => H - B - (v - y0) / (y1 - y0) * (H - T - B);
+      const svg = mk('svg', { viewBox:`0 0 ${W} ${H}`, class:'lchart-svg', role:'img' });
+      box.insertBefore(svg, box.querySelector('.legend'));
+      const ticks = [];
+      const txt = (x, y, t, anchor) => { const e = mk('text', { x, y, 'text-anchor':anchor, style:'fill:var(--mute);font-size:13px' }, svg, t); ticks.push(e); return e; };
+      yt.forEach(v => { mk('line', { x1:L, x2:W - R, y1:Y(v), y2:Y(v), style:'stroke:var(--line)' }, svg); txt(L - 8, Y(v) + 4.5, fy(v), 'end'); });
+      xt.forEach(v => txt(X(v), H - B + 19, fx(v), 'middle'));
+      mk('line', { x1:L, x2:W - R, y1:H - B, y2:H - B, style:'stroke:var(--mute)' }, svg);
+      if (s.xlabel) txt((L + W - R) / 2, H - 6, s.xlabel, 'middle');
+      const truncated = y0 > 0;
+      if (truncated) {  // axis break mark at the bottom of the y range
+        const by = H - B - 14;
+        [0, 5].forEach(d => mk('line', { x1:L - 6, x2:L + 6, y1:by + 3 - d, y2:by - 3 - d, style:'stroke:var(--mute);stroke-width:1.5' }, svg));
+      }
+      const segs = [], dots = [];
+      (s.series || []).forEach(se => {
+        const pts = se.points.map(([a, b]) => [X(a), Y(b)]);
+        if (se.line !== false && pts.length > 1) {
+          mk('path', { d:pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(''), fill:'none',
+                       style:`stroke:${col(se.color)};stroke-width:2.6;${se.dash ? 'stroke-dasharray:7 5;' : ''}`, 'stroke-linejoin':'round' }, svg);
+          for (let i = 1; i < pts.length; i++) segs.push([pts[i - 1], pts[i]]);
+        }
+        pts.forEach((p, i) => {
+          const c = mk('circle', { cx:p[0], cy:p[1], r:4.2, style:`fill:${se.hollow ? 'var(--bg)' : col(se.color)};stroke:${col(se.color)};stroke-width:2` }, svg);
+          mk('title', {}, c, `${se.name ? se.name + ': ' : ''}${fx(se.points[i][0])}, ${fy(se.points[i][1])}`);
+          dots.push(p);
+        });
+      });
+      const placed = ticks.map(e => e.getBBox());
+      const hits = (b) => {
+        const pad = 2, l = b.x - pad, r = b.x + b.width + pad, t = b.y - pad, d = b.y + b.height + pad;
+        const inside = (x, y) => x >= l && x <= r && y >= t && y <= d;
+        if (b.x < L - 4 || b.x + b.width > W || b.y < 0 || b.y + b.height > H - B) return true;
+        if (dots.some(([x, y]) => x + 4 >= l && x - 4 <= r && y + 4 >= t && y - 4 <= d)) return true;
+        if (placed.some(o => !(o.x + o.width < l || o.x > r || o.y + o.height < t || o.y > d))) return true;
+        return segs.some(([p, q]) => { for (let k = 0; k <= 24; k++) { const u = k / 24; if (inside(p[0] + u * (q[0] - p[0]), p[1] + u * (q[1] - p[1]))) return true; } return false; });
+      };
+      (s.labels || []).forEach(lb => {
+        const px = X(lb.at[0]), py = Y(lb.at[1]);
+        const want = lb.pos || 'above';
+        const order = [want, ...Object.keys(OFF).filter(k => k !== want)];
+        const t = mk('text', { style:`fill:${col(lb.color)};font-size:14px;font-weight:650` }, svg, lb.text);
+        let ok = false;
+        for (const far of [0, 16, 32]) {  // try every side next to the point, then farther out
+          for (const k of order) {
+            const [dx, dy, anchor] = OFF[k];
+            t.setAttribute('x', px + dx + Math.sign(dx) * far + (lb.dx || 0)); t.setAttribute('y', py + dy + Math.sign(dy) * far + (lb.dy || 0));
+            t.setAttribute('text-anchor', anchor);
+            if (!hits(t.getBBox())) { ok = true; break; }
+          }
+          if (ok) break;
+        }
+        if (!ok) {
+          const [dx, dy, anchor] = OFF[want];
+          t.setAttribute('x', px + dx + (lb.dx || 0)); t.setAttribute('y', py + dy + (lb.dy || 0)); t.setAttribute('text-anchor', anchor);
+          console.warn(`lchart: label "${lb.text}" overlaps a line, point, or label wherever it goes; shorten it or move it with dx/dy`);
+        }
+        placed.push(t.getBBox());
+      });
+    });
+  })();
+</script>
 <script>
   // Navigation comes before the KaTeX scripts so a slow or failed CDN cannot break it.
   (() => {
