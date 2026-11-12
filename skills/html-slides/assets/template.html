@@ -96,6 +96,13 @@
   .lchart svg.lchart-svg { width:100%; height:auto; display:block; overflow:visible; }
   .lchart .legend { display:flex; flex-wrap:wrap; gap:.3em 1.4em; align-items:center; }
   .lchart .legend svg { width:2em; height:.8em; vertical-align:middle; margin-right:.35em; }
+  .lchart { position:relative; }
+  .lchart-tip { position:absolute; z-index:5; pointer-events:none; white-space:nowrap; font-size:.8em; line-height:1.45;
+                background:var(--paper); color:var(--ink); border:1px solid var(--line); border-radius:6px;
+                padding:.35em .65em; box-shadow:0 3px 10px rgba(0,0,0,.18); }
+  .lchart-tip[hidden] { display:none; }
+  .lchart-tip .h { color:var(--mute); }
+  @media print { .lchart-tip { display:none !important; } }
   /* stat tiles */
   .key { display:grid; grid-template-columns:repeat(3,1fr); gap:1.2vw; }
   .kpi { background:var(--bg); border-radius:.7vw; padding:1vw 1.2vw; }
@@ -322,6 +329,8 @@
   // Line charts. Runs before navigation hides slides, so every chart can be measured.
   // Spec: x, y ([min,max]); xticks, yticks; xfmt, yfmt ("{}%"); xlabel; aspect (width/height, default 1.75);
   // series [{name, color, points:[[x,y],...], dash, hollow, line:false}]; labels [{at:[x,y], text, color, pos, dx, dy}]; note.
+  // Hover: a guide snaps to the nearest x and a box lists every series' value there. A point written [x, y, "text"]
+  // shows "text" in the box instead of the formatted y (e.g. the runs behind a mean). xtip formats the box header (default xfmt).
   // Height: W/aspect, unless the box is stretched by layout (style="flex:1;min-height:0" in a flex-column section); then it fills the box.
   // Colors are theme variable names (hl, neutral, blue, red, green, amber, mute, ink).
   // A label is moved off lines, points, and other labels when its requested spot collides; one that can't be placed logs "lchart:".
@@ -379,7 +388,7 @@
         const by = H - B - 14;
         [0, 5].forEach(d => mk('line', { x1:L - 6, x2:L + 6, y1:by + 3 - d, y2:by - 3 - d, style:'stroke:var(--mute);stroke-width:1.5' }, svg));
       }
-      const segs = [], dots = [];
+      const segs = [], dots = [], marks = [];  // marks: one entry per drawn point, for the hover box
       (s.series || []).forEach(se => {
         const pts = se.points.map(([a, b]) => [X(a), Y(b)]);
         if (se.line !== false && pts.length > 1) {
@@ -389,9 +398,36 @@
         }
         pts.forEach((p, i) => {
           const c = mk('circle', { cx:p[0], cy:p[1], r:4.2, style:`fill:${se.hollow ? 'var(--bg)' : col(se.color)};stroke:${col(se.color)};stroke-width:2` }, svg);
-          mk('title', {}, c, `${se.name ? se.name + ': ' : ''}${fx(se.points[i][0])}, ${fy(se.points[i][1])}`);
+          const [vx, vy, note] = se.points[i];
+          marks.push({ c, vx, vy, se, text: note != null ? String(note) : fy(vy) });
           dots.push(p);
         });
+      });
+      // Hover: a transparent plot-area rect catches the pointer; the nearest x gets a guide line, enlarged points, and a value box.
+      const guide = mk('line', { x1:0, x2:0, y1:T, y2:H - B, style:'stroke:var(--mute);stroke-width:1;stroke-dasharray:3 3;visibility:hidden' }, svg);
+      const tip = document.createElement('div');
+      tip.className = 'lchart-tip'; tip.hidden = true; box.appendChild(tip);
+      const xs = [...new Set(marks.map(m => m.vx))].sort((a, b) => a - b);
+      const esc = t => String(t).replace(/[&<>]/g, ch => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' })[ch]);
+      const hide = () => { tip.hidden = true; guide.style.visibility = 'hidden'; marks.forEach(m => m.c.setAttribute('r', 4.2)); };
+      const zone = mk('rect', { x:L, y:0, width:W - L - R, height:H - B, style:'fill:transparent;cursor:crosshair' }, svg);
+      zone.addEventListener('pointerleave', hide);
+      zone.addEventListener('pointermove', e => {
+        if (!xs.length) return;
+        const r = svg.getBoundingClientRect(), sx = (e.clientX - r.left) * W / r.width;
+        const vx = xs.reduce((a, b) => Math.abs(X(b) - sx) < Math.abs(X(a) - sx) ? b : a);
+        const here = marks.filter(m => m.vx === vx).sort((a, b) => b.vy - a.vy);
+        marks.forEach(m => m.c.setAttribute('r', m.vx === vx ? 6.5 : 4.2));
+        guide.setAttribute('x1', X(vx)); guide.setAttribute('x2', X(vx)); guide.style.visibility = 'visible';
+        tip.innerHTML = `<div class="h">${esc((s.xtip || s.xfmt || '{}').replace('{}', vx))}</div>` + here.map(m =>
+          `<div><span style="color:${col(m.se.color)}">●</span> ${m.se.name ? esc(m.se.name) + '：' : ''}<b>${esc(m.text)}</b></div>`).join('');
+        tip.hidden = false;
+        const br = box.getBoundingClientRect(), sc = br.width / box.offsetWidth || 1;  // CSS px per layout px (slides may be scaled)
+        const px = (r.left - br.left + X(vx) * r.width / W) / sc, py = (e.clientY - br.top) / sc;
+        let left = px + 14;
+        if (left + tip.offsetWidth > box.offsetWidth) left = px - 14 - tip.offsetWidth;
+        tip.style.left = Math.max(0, left) + 'px';
+        tip.style.top = Math.min(Math.max(0, py - tip.offsetHeight / 2), Math.max(0, box.offsetHeight - tip.offsetHeight)) + 'px';
       });
       const placed = ticks.map(e => e.getBBox());
       const hits = (b) => {
@@ -406,7 +442,7 @@
         const px = X(lb.at[0]), py = Y(lb.at[1]);
         const want = lb.pos || 'above';
         const order = [want, ...Object.keys(OFF).filter(k => k !== want)];
-        const t = mk('text', { style:`fill:${col(lb.color)};font-size:14px;font-weight:650` }, svg, lb.text);
+        const t = mk('text', { style:`fill:${col(lb.color)};font-size:14px;font-weight:650;pointer-events:none` }, svg, lb.text);
         let ok = false;
         for (const far of [0, 16, 32]) {  // try every side next to the point, then farther out
           for (const k of order) {

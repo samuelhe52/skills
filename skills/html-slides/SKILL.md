@@ -78,6 +78,8 @@ Compute widths from the values, with a short script when there are many:
 
 Write the data as JSON inside the `.lchart` element; see the template's line chart slide. The spec fields are listed in a comment above the renderer in the template's runtime.
 
+- **Hover:** every chart shows a guide line and a box with each series' value at the x nearest the pointer. A point written `[x, y, "text"]` shows `text` in the box instead of the formatted y; use it for the runs behind a mean or a p-value. `xtip` formats the box header, as in `"step {}"`.
+- **Units:** the y axis and every label must use the same unit. If the slide talks in counts, plot counts.
 - **Series:** `points` as `[[x, y], …]` in data units. Give the subject `"color":"hl"` and comparisons `"neutral"`, or use `"dash":true` to tell lines apart. A run shown as single points takes `"line":false`, plus `"hollow":true` when it is incomplete or only suggestive.
 - **Labels:** label the values the slide talks about, such as start, end, peak, and any point the text cites, rather than every point. Each label goes `"above"` its point unless `pos` says otherwise. If that spot hits a line, a point, a tick label, or another label, the runtime moves the label. A label that fits nowhere logs `lchart:` to the console, and the render check fails.
 - **Axes:** set `x`, `y`, `xticks`, and `yticks`, and use `yfmt` such as `"{}%"` for units. A y range that starts above zero gets an axis break mark and a "truncated" note in the legend automatically. Use a truncated axis only when the differences that matter would otherwise be invisible.
